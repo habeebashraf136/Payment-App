@@ -36,13 +36,13 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       
       // Do not try to refresh if the request was for login or token refresh
-      if (originalRequest.url.includes('/auth/get-AccessToken') || originalRequest.url.includes('/auth/login')) {
+      if (originalRequest.url.includes('/api/auth/get-AccessToken') || originalRequest.url.includes('/api/auth/login')) {
         return Promise.reject(error);
       }
       
       try {
         // Attempt to refresh the token using the httpOnly cookie
-        const res = await axios.post(`${API_BASE_URL}/auth/get-AccessToken`, {}, {
+        const res = await axios.post(`${API_BASE_URL}/api/auth/get-AccessToken`, {}, {
           withCredentials: true 
         });
         

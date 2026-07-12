@@ -12,13 +12,13 @@ export const AuthProvider = ({ children }) => {
     const initializeAuth = async () => {
       try {
         // Ask the backend to issue a new access token using the stored refresh cookie
-        const res = await apiClient.post('/auth/get-AccessToken');
+        const res = await apiClient.post('/api/auth/get-AccessToken');
         if (res.data.success && res.data.accessToken) {
           // Store the token in memory so subsequent requests are authenticated
           setAccessToken(res.data.accessToken);
 
           // Now fetch the actual user profile
-          const userRes = await apiClient.get('/auth/get-User');
+          const userRes = await apiClient.get('/api/auth/get-User');
           if (userRes.data.success) {
             setUser(userRes.data.user);
           }
@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
 
   const logoutUser = async () => {
     try {
-      await apiClient.post('/auth/logout');
+      await apiClient.post('/api/auth/logout');
     } catch (_) {
       // Even if server-side fails, clear client state
     } finally {
