@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/* ──── Design Tokens ──── */
+@theme {
+  /* Primary Purple palette – PhonePe-inspired deep purple */
+  --color-primary-50:  #f3f0ff;
+  --color-primary-100: #e3ddfc;
+  --color-primary-200: #c5b8f6;
+  --color-primary-300: #a48df0;
+  --color-primary-400: #8462e8;
+  --color-primary-500: #6739b7;
+  --color-primary-600: #5b2d9e;
+  --color-primary-700: #4a2382;
+  --color-primary-800: #391a65;
+  --color-primary-900: #29124a;
+
+  /* Accent warm orange for CTAs */
+  --color-accent-400: #ff9f43;
+  --color-accent-500: #f7871e;
+  --color-accent-600: #e0720a;
+
+  /* Surface / Card */
+  --color-surface:    #ffffff;
+  --color-surface-dim: #f8f7fc;
+
+  /* Font family */
+  --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ──── Base Styles ──── */
+@layer base {
+  html {
+    font-size: 16px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-surface-dim text-gray-900 font-sans antialiased;
+    min-height: 100dvh;
+  }
+  input, button {
+    font-family: inherit;
+  }
+}
+
+/* ──── Utilities ──── */
+@layer utilities {
+  /* Glass-morphism panel */
+  .glass-panel {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100;
+  }
+
+  /* Fade-up micro-animation */
+  .fade-up {
+    animation: fadeUp 0.35s ease-out both;
+  }
+  @keyframes fadeUp {
+    0%   { opacity: 0; transform: translateY(12px); }
+    100% { opacity: 1; transform: translateY(0);    }
+  }
+
+  /* Slide-up for bottom sheets */
+  .slide-up {
+    animation: slideUp 0.32s cubic-bezier(.32,.72,.37,1.12) both;
+  }
+  @keyframes slideUp {
+    0%   { transform: translateY(100%); }
+    100% { transform: translateY(0);    }
+  }
+
+  /* Subtle shimmer for loading skeletons */
+  .shimmer {
+    @apply bg-gray-200 rounded animate-pulse;
+  }
+
+  /* BottomNav active indicator */
+  .nav-active {
+    @apply text-primary-600 font-semibold;
+  }
+  .nav-active::after {
+    content: '';
+    display: block;
+    width: 20px;
+    height: 3px;
+    border-radius: 9999px;
+    margin: 4px auto 0;
+    @apply bg-primary-600;
+  }
+
+  /* Number input: hide spinners */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
