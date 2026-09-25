@@ -37,9 +37,9 @@ const Profile = () => {
             {(user?.username || 'U').charAt(0).toUpperCase()}
           </div>
           <h2 className="text-xl font-bold text-gray-800">{user?.username || 'User'}</h2>
-          <p className="text-gray-500 text-sm mt-0.5">{user?.phoneNumber || user?.email}</p>
+          <p className="text-gray-500 text-sm mt-0.5">{user?.phone_number || user?.email}</p>
           <div className="mt-3 bg-gray-100 px-4 py-1.5 rounded-lg text-xs font-mono text-gray-600 tracking-wide">
-            {user?.upiId || '—'}
+            UPI ID: {user?.upi_id || '-'}
           </div>
         </div>
       </div>

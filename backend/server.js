@@ -8,7 +8,6 @@ connectDB()
 
 
 
-
 app.listen(PORT, () => {
     logger.info(`Server is running on port ${PORT}`);
 });

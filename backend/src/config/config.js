@@ -3,8 +3,8 @@ dotenv.config();
 import logger from '../utils/logger.js';
 
 
-if (!process.env.MONGO_URI) {
-  const err = new Error('MONGO_URI is not defined in environment variables');
+if (!process.env.DATABASE_URL) {
+  const err = new Error('DATABASE_URL is not defined in environment variables');
   logger.error(err.message); 
   process.exit(1);           
 }
@@ -53,7 +53,7 @@ if(!process.env.FRONTEND_URL) {
 
 
 const config = {
-    MONGO_URI: process.env.MONGO_URI,
+    DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
     JWT_SECRET: process.env.JWT_SECRET,
     JWT_SECRET_KEY: process.env.JWT_SECRET_KEY,

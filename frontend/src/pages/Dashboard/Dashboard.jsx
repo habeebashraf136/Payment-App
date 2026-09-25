@@ -30,7 +30,7 @@ const Dashboard = () => {
   /* ── Fetch wallet + recent txns ── */
   useEffect(() => {
     (async () => {
-      try { const w = await walletService.checkBalance(); if (w.success) setBalance(w.balance ?? 0); }
+      try { const w = await walletService.checkBalance(); if (w.success) setBalance(w.wallet.balance ?? 0) }
       catch (_) {}
       try { const t = await transactionService.getTransactions(); if (t.success) setTransactions((t.transactions ?? []).slice(0, 5)); }
       catch (_) {}
@@ -78,11 +78,12 @@ const Dashboard = () => {
               <span className="shimmer w-24 h-8 inline-block" />
             ) : (
               <span className="text-3xl font-extrabold tracking-tight">
+                {console.log(balance)}
                 {(balance ?? 0).toLocaleString('en-IN')}
               </span>
             )}
           </div>
-          <p className="text-[11px] text-primary-200 mt-2 font-mono">UPI ID: {user?.upiId || '—'}</p>
+          <p className="text-[11px] text-primary-200 mt-2 font-mono">UPI ID: {user?.upi_id || '-'}</p>
 
           {/* Add money pill */}
           <button className="absolute right-4 bottom-4 flex items-center gap-1 bg-white/20 hover:bg-white/30 text-[11px] font-semibold px-3 py-1.5 rounded-full transition">

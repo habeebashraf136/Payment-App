@@ -1,9 +1,6 @@
-import mongoose from 'mongoose'; // ✅ Bug 1 fix
-import userModel from '../models/user.model.js';
-import transactionModel from '../models/transaction.model.js';
-import walletModel from '../models/wallet.model.js';
 import asyncHandler from '../utils/async.handler.js';
-import mPinModel from '../models/mpin.model.js';
+import { pool } from '../config/database.js';
+import bcrypt from 'bcrypt';
 
 
 export const sendMoney = asyncHandler(async (req, res, next) => {
@@ -18,6 +15,7 @@ export const sendMoney = asyncHandler(async (req, res, next) => {
     }
 
     const parsedAmount = Number(amount);
+    
     if (!parsedAmount || parsedAmount <= 0) { 
         return res.status(400).json({ 
             success: false, 
@@ -25,30 +23,39 @@ export const sendMoney = asyncHandler(async (req, res, next) => {
         });
     }
 
-    if (parsedAmount > 100000) {
+    if (parsedAmount > 1000000) {
         return res.status(400).json({ 
             success: false, 
-            message: 'Amount exceeds the maximum limit of 1,00,000' 
+            message: 'Amount exceeds the maximum limit of 10,00,000' 
         });
     }
 
-    const senderUser = await userModel.findById(senderId);
-    if (!senderUser) {
+    const senderUser = await pool.query(
+        'select * from users where id = $1',
+        [senderId]
+    );
+
+    if (!senderUser.rows.length > 0) {
         return res.status(404).json({ 
             success: false, 
             message: 'Sender user not found' 
         });
     }
 
-    const senderMpin = await mPinModel.findOne({ userid: senderId }).select('+mpin');
-    if (!senderMpin) {
+    const senderMpin = await pool.query(
+        'select * from mpins where user_id = $1',
+        [senderId]
+    );
+
+    if (!senderMpin.rows.length > 0) {
         return res.status(404).json({ 
             success: false, 
             message: 'Please set your MPIN before making a transaction' 
         });
     }
 
-    const isMpinValid = await senderMpin.compareMpin(mpin);
+    const isMpinValid = await bcrypt.compare(String(mpin), senderMpin.rows[0].mpin_hash);
+
     if (!isMpinValid) {
         return res.status(401).json({ 
             success: false, 
@@ -56,26 +63,30 @@ export const sendMoney = asyncHandler(async (req, res, next) => {
         });
     }
 
-    const receiverUser = await userModel.findOne({
-        $or: [{ upiId: receiverIdentifier }, { phoneNumber: receiverIdentifier }]
-    });
+    const receiverUser = await pool.query(
+        `select id from users where upi_id =$1 OR phone_number =$1 LIMIT 1`,
+        [receiverIdentifier]
+    );
 
-    if (!receiverUser) {
+    if (receiverUser.rows.length === 0) {
         return res.status(404).json({ 
             success: false, 
             message: 'Receiver user not found' 
         });
     }
 
-    if (senderUser._id.equals(receiverUser._id)) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'You cannot send money to yourself' 
-        });
+    const receiverId = receiverUser.rows[0].id;
+
+    if (receiverId === senderId) {
+        return res.status(400).json({ success: false, message: 'You cannot send money to yourself' });
     }
 
-    const receiverWallet = await walletModel.findOne({ userid: receiverUser._id });
-    if (!receiverWallet) {
+    const receiverWallet = await pool.query(
+        'select * from wallets where user_id = $1',
+        [receiverId]
+    );
+
+    if (!receiverWallet.rows.length > 0) {
         return res.status(404).json({ 
             success: false, 
             message: 'Receiver wallet not found' 
@@ -89,79 +100,108 @@ export const sendMoney = asyncHandler(async (req, res, next) => {
         });
     }
 
-    const session = await mongoose.startSession();
-    let transaction;
+    const client = await pool.connect();
 
-    try {
-        await session.withTransaction(async () => {
+    try{
+        await client.query('BEGIN');
 
-            const updatedSenderWallet = await walletModel.findOneAndUpdate(
-                { userid: senderUser._id, balance: { $gte: parsedAmount }, status: 'active' },
-                { $inc: { balance: -parsedAmount } },
-                { new: true, session }
-            );
+        const { rows: wallets } = await
+        client.query(
+            `select user_id, status from wallets
+            where user_id = ANY($1::uuid[])
+            order by user_id
+            for update`,
+            [[senderId, receiverId]]
+        );
 
-            if (!updatedSenderWallet) {
-                const senderWallet = await walletModel.findOne({ userid: senderUser._id }).session(session);
-                const msg = !senderWallet || senderWallet.status === 'inactive'
-                    ? 'Sender wallet is inactive or not found'
-                    : 'Insufficient balance in sender wallet';
-                throw Object.assign(new Error(msg), { statusCode: 400 });
-            }
+        const senderWallet = wallets.find(w => w.user_id === senderId);
+        const receiverWallet = wallets.find(w => w.user_id === receiverId);
 
-            await walletModel.findOneAndUpdate(
-                { userid: receiverUser._id },
-                { $inc: { balance: parsedAmount } },
-                { session }
-            );
+        if (!senderWallet || senderWallet.status !== 'active') {
+            throw Object.assign(new Error('Sender wallet is inactive or not found'), { statusCode: 400 });
+        }
 
-            [transaction] = await transactionModel.create([{
-                sender: senderUser._id,
-                receiver: receiverUser._id,
-                amount: parsedAmount,
-                currency: 'INR',
-                status: 'success',
-                type: 'transfer',
-            }], { session });
+        if (!receiverWallet || receiverWallet.status !== 'active') {
+            throw Object.assign(new Error('Receiver wallet is inactive or not found'), { statusCode: 400 });
+        }
+
+        const debit = await client.query(
+            `update wallets
+            set balance = balance -$1
+            where user_id =$2 AND balance >= $1
+            returning balance`,
+            [amount,senderId]
+        );
+
+        if (debit.rowCount === 0) {
+            throw Object.assign(new Error('Insufficient balance in sender wallet'), { statusCode: 400 });
+        }
+
+        await client.query(
+            `UPDATE wallets SET balance = balance + $1 WHERE user_id = $2`,
+            [amount, receiverId]
+        );
+
+        const { rows } = await client.query(
+            `INSERT INTO transactions
+                (sender_id, receiver_id, amount, currency, status, type)
+            VALUES ($1, $2, $3, 'INR', 'success', 'transfer')
+            RETURNING *`,
+            [senderId, receiverId, amount]
+        );
+
+        await client.query('COMMIT');
+
+        res.status(200).json({
+            success: true,
+            message: 'Money sent successfully',
+            transaction: rows[0],
         });
-
-        res.status(200).json({ 
-            success: true, 
-            message: 'Money sent successfully', 
-            transaction 
-        });
-
-    } catch (error) {
+    }
+    catch (error) {
+        await client.query('ROLLBACK');
         next(error);
     } finally {
-        await session.endSession();
-    }
+        client.release();
+    } 
 });
 
 export const getTransactions = asyncHandler(async (req, res, next) => {
     const userId = req.user.id;
 
-    const transactions = await transactionModel.find({
-        $or:[
-            { sender: userId },
-            { receiver: userId }
-        ]
-    })
-    .sort({ createdAt: -1 })
-    .populate('sender', 'name email phoneNumber')
-    .populate('receiver', 'name email phoneNumber')
-    .limit(20);
+    const { rows: transactions } = await pool.query(
+        `SELECT
+            t.amount,
+            t.currency,
+            t.status,
+            t.type,
+            t.created_at,
+            s.id            AS sender_id,
+            s.username          AS sender_name,
+            s.email         AS sender_email,
+            s.phone_number  AS sender_phone_number,
+            r.id            AS receiver_id,
+            r.username          AS receiver_name,
+            r.email         AS receiver_email,
+            r.phone_number  AS receiver_phone_number
+         FROM transactions t
+         JOIN users s ON s.id = t.sender_id
+         JOIN users r ON r.id = t.receiver_id
+         WHERE t.sender_id = $1 OR t.receiver_id = $1
+         ORDER BY t.created_at DESC
+         LIMIT 20`,
+        [userId]
+    );
 
-    if(!transactions || transactions.length === 0){
+    if (transactions.length === 0) {
         return res.status(404).json({
             success: false,
-            message: "No transactions found for this user"
-        })
+            message: 'No transactions found for this user'
+        });
     }
 
     return res.status(200).json({
         success: true,
         transactions
-    })
-
+    });
 });

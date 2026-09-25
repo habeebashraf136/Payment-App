@@ -17,7 +17,7 @@ const groupByDate = (txns) => {
   const groups = { Today: [], Yesterday: [], 'This Week': [], Earlier: [] };
 
   txns.forEach(tx => {
-    const d = new Date(tx.createdAt); d.setHours(0,0,0,0);
+    const d = new Date(tx.created_at); d.setHours(0,0,0,0);
     if (d.getTime() === today.getTime())          groups['Today'].push(tx);
     else if (d.getTime() === yesterday.getTime())  groups['Yesterday'].push(tx);
     else if (d >= weekStart)                        groups['This Week'].push(tx);
@@ -49,7 +49,7 @@ const History = () => {
 
   /* ── Helpers ── */
   const myId   = String(user?._id || user?.id || '');
-  const isSent = (tx) => String(tx.sender?._id || tx.sender || '') === myId;
+  const isSent = (tx) => String(tx.sender_id || '') === myId;
 
   const filteredTx = transactions
     .filter(tx => {
@@ -59,8 +59,7 @@ const History = () => {
     })
     .filter(tx => {
       if (!search.trim()) return true;
-      const other = isSent(tx) ? tx.receiver : tx.sender;
-      const name  = (other?.username || other?.email || '').toLowerCase();
+      const name = (isSent(tx) ? tx.receiver_name : tx.sender_name || '').toLowerCase();
       return name.includes(search.toLowerCase());
     });
 
@@ -122,10 +121,11 @@ const History = () => {
               <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
               <div className="glass-panel divide-y divide-gray-50 overflow-hidden">
                 {txns.map(tx => {
-                  const sent  = isSent(tx);
-                  const other = sent ? tx.receiver : tx.sender;
-                  const name  = other?.username || other?.email || 'Unknown';
-                  const open  = expanded === tx._id;
+                  const sent = isSent(tx);
+                  const name = sent
+                    ? (tx.receiver_name || tx.receiver_email || 'Unknown')
+                    : (tx.sender_name || tx.sender_email || 'Unknown');
+                  const open = expanded === tx._id;
 
                   return (
                     <div key={tx._id}>
@@ -140,7 +140,7 @@ const History = () => {
                           </div>
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-gray-800 truncate">{sent ? 'Paid to' : 'Received from'} {name}</p>
-                            <p className="text-[11px] text-gray-400">{fmtTime(tx.createdAt)}</p>
+                            <p className="text-[11px] text-gray-400">{fmtTime(tx.created_at)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -155,7 +155,7 @@ const History = () => {
                       {open && (
                         <div className="px-4 pb-4 pt-1 bg-gray-50/50 text-xs text-gray-500 space-y-1 fade-up">
                           <div className="flex justify-between"><span>Transaction ID</span><span className="font-mono text-gray-600 flex items-center gap-1">{tx._id?.slice(-10)}<Copy size={11} className="cursor-pointer hover:text-primary-500" /></span></div>
-                          <div className="flex justify-between"><span>Date</span><span>{new Date(tx.createdAt).toLocaleString('en-IN')}</span></div>
+                          <div className="flex justify-between"><span>Date</span><span>{new Date(tx.created_at).toLocaleString('en-IN')}</span></div>
                           <div className="flex justify-between"><span>Status</span>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${tx.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
                               {tx.status?.toUpperCase() || 'SUCCESS'}

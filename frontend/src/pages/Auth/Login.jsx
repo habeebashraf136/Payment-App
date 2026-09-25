@@ -12,12 +12,16 @@ const Login = () => {
   const navigate = useNavigate();
   const { loginUser } = useContext(AuthContext);
 
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
       const res = await authService.login({ email, password });
-      if (res.success) { loginUser(res.user, res.accessToken); navigate('/dashboard'); }
+      if (res.success) {
+        await loginUser(res.user, res.accessToken);
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.response?.data?.errors?.[0]?.msg || err.response?.data?.message || 'Login failed');
     } finally { setLoading(false); }
